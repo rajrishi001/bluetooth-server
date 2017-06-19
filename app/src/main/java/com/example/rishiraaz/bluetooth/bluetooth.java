@@ -91,19 +91,45 @@ import android.widget.Toast;
 import android.app.AlertDialog.Builder;
 import android.os.Message;
 
-public class bluetooth extends AppCompatActivity {
+import android.app.Activity;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
+import android.util.Log;
+import android.widget.TextView;
+import java.lang.Math;
+
+
+
+public class bluetooth extends AppCompatActivity implements SensorEventListener {
     private static final String Tag = "bluetooth";
     BluetoothAdapter mBluetoothAdapter;
     int Bluetooth_REQUEST = 1;
     UUID uuid = UUID.fromString("fa87c0d0-afac-11de-8a39-0800200c9a66");
 
 
+   private SensorManager mSensorManager;
+    private Sensor mAccelerometer;
+    private Sensor mMagnetometer;
+    private float[] mLastAccelerometer = new float[3];
+    private float[] mLastMagnetometer = new float[3];
+    private boolean mLastAccelerometerSet = false;
+    private boolean mLastMagnetometerSet = false;
+    private float[] mR = new float[9];
+    private float[] mOrientation = new float[3];
+    private float mCurrentDegree = 0f;
+    private int mdeg=0;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_bluetooth);
         Button btonoff = (Button) findViewById(R.id.btonoff);
-        final TextView rssi = (TextView) findViewById(R.id.rssi);
+
+        mSensorManager = (SensorManager)getSystemService(SENSOR_SERVICE);
+        mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        mMagnetometer = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+
         //registerReceiver(receiver, new IntentFilter(BluetoothDevice.ACTION_FOUND));
 
         btonoff.setOnClickListener(new View.OnClickListener() {
@@ -127,7 +153,14 @@ public class bluetooth extends AppCompatActivity {
                 Intent discoverableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
                 discoverableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 60);
                 startActivity(discoverableIntent);
+                                           /*int i=0;
+                                           while(i<10){
+                                               rssi.setText("direction"+dew.mdeg);
+                                               i++;
+                                               SystemClock.sleep(1000);
+                                           }*/
                                        //       Toast.makeText(getApplicationContext(), "Now your device is discoverable by others", Toast.LENGTH_LONG).show();
+
 ////                Set<BluetoothDevice> pairedDevices = mBluetoothAdapter.getBondedDevices();
 //
 //                if (pairedDevices.size() > 0) {
@@ -176,6 +209,9 @@ public class bluetooth extends AppCompatActivity {
         }
 
     }
+
+
+
     /*@Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.activity_bluetooth, menu);
@@ -197,10 +233,23 @@ public class bluetooth extends AppCompatActivity {
 
 
     //UUID uuid = UUID.fromString("a60f35f0-b93a-11de-8a39-08002009c666");
-    private BluetoothSocket socket = null;
 
+
+    protected void onResume() {
+        super.onResume();
+        mSensorManager.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_GAME);
+        mSensorManager.registerListener(this, mMagnetometer, SensorManager.SENSOR_DELAY_GAME);
+    }
+    protected void onPause() {
+        super.onPause();
+        mSensorManager.unregisterListener(this, mAccelerometer);
+        mSensorManager.unregisterListener(this, mMagnetometer);
+    }
+    //int j=0;
+    private  BluetoothSocket socket, socket1;
+    private BluetoothServerSocket mmServerSocket;
     private class AcceptThread extends Thread {
-        private final BluetoothServerSocket mmServerSocket;
+
 
         public AcceptThread() {
             // Use a temporary object that is later assigned to mmServerSocket
@@ -209,7 +258,7 @@ public class bluetooth extends AppCompatActivity {
             try {
                 Log.v("raj", "wow");
                 // MY_UUID is the app's UUID string, also used by the client code.
-                tmp = mBluetoothAdapter.listenUsingRfcommWithServiceRecord("Nexus 5", uuid);
+                tmp = mBluetoothAdapter.listenUsingRfcommWithServiceRecord("GiONEE P5 mini", uuid);
                 Log.v("raj", "wow1");
             } catch (IOException e) {
                 Log.e("raj", "Socket's listen() method failed", e);
@@ -234,40 +283,105 @@ public class bluetooth extends AppCompatActivity {
                 if (socket != null) {
                     // A connection was accepted. Perform work associated with.
                     // the connection in a separate thread.
-                   // manageMyConnectedSocket(socket);
+                    // manageMyConnectedSocket(socket);
                     Log.v("raj", "wow5");
-Handler handler=new Handler(Looper.getMainLooper());
+                    Handler handler = new Handler(Looper.getMainLooper());
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
                             Toast.makeText(getBaseContext(), "Ble connected", Toast.LENGTH_LONG).show();
                         }
                     });
-                    ConnectedThread2 raw=new ConnectedThread2(socket);
-                    String message="ho gaya bhai .... maja aa gaya";
-                    raw.write(message.getBytes());
-                    try {
+                    //int j = 0;
+
+                    socket1=socket;
+                    mdeg = 1;
+
+                    /*try {
                         mmServerSocket.close();
                         Log.v("raj", "socket close");
                     } catch (IOException e) {
                         Log.e("raj", "Could not close the connect socket", e);
-                    }
+                    }*/
                     Log.v("raj", "break;");
                     break;
                 }
             }
         }
 
+
         // Closes the connect socket and causes the thread to finish.
-        public void cancel() {
+        /*public void cancel() {
             try {
                 mmServerSocket.close();
             } catch (IOException e) {
                 Log.e("raj", "Could not close the connect socket", e);
             }
 
-        }
+        }*/
+
     }
+
+    public int j=0;
+        public void onSensorChanged(SensorEvent event) {
+            final float alpha1 = 0.97f;
+            final float alpha = 0.97f;
+            if (event.sensor == mAccelerometer) {
+                //System.arraycopy(event.values, 0, mLastAccelerometer, 0, event.values.length);
+                mLastAccelerometerSet = true;
+                mLastAccelerometer[0] = alpha * mLastAccelerometer[0] + (1 - alpha)
+                        * event.values[0];
+                mLastAccelerometer[1] = alpha * mLastAccelerometer[1] + (1 - alpha)
+                        * event.values[1];
+                mLastAccelerometer[2] = alpha * mLastAccelerometer[2] + (1 - alpha)
+                        * event.values[2];
+
+            }
+            if (event.sensor == mMagnetometer) {
+                //System.arraycopy(event.values, 0, mLastMagnetometer, 0, event.values.length);
+                mLastMagnetometerSet = true;
+                mLastMagnetometer[0] = alpha1 * mLastMagnetometer[0] + (1 - alpha1)
+                        * event.values[0];
+                mLastMagnetometer[1] = alpha1 * mLastMagnetometer[1] + (1 - alpha1)
+                        * event.values[1];
+                mLastMagnetometer[2] = alpha1 * mLastMagnetometer[2] + (1 - alpha1)
+                        * event.values[2];
+            }
+            if (mLastMagnetometerSet && mLastAccelerometerSet) {
+                SensorManager.getRotationMatrix(mR, null, mLastAccelerometer, mLastMagnetometer);
+                SensorManager.getOrientation(mR, mOrientation);
+                float azimuthInRadians = mOrientation[0];
+                float azimuthInDegress = (float) (Math.toDegrees(azimuthInRadians) + 360) % 360;
+            /*RotateAnimation ra = new RotateAnimation(
+                    mCurrentDegree,
+                    -azimuthInDegress,
+                    Animation.RELATIVE_TO_SELF, 0.5f,
+                    Animation.RELATIVE_TO_SELF,
+                    0.5f);
+
+            ra.setDuration(250);
+
+            ra.setFillAfter(true);
+
+            mPointer.startAnimation(ra);*/
+                mCurrentDegree = azimuthInDegress;
+                j=j+1;
+                if(j>200 && mdeg==1){
+                    final ConnectedThread2 raw=new ConnectedThread2(socket1);
+                    String message = Float.toString(mCurrentDegree);// dew.mdeg;
+                    raw.write(message.getBytes());
+               Log.v("raj", Integer.toString(Math.round(mCurrentDegree)));
+                    j=0;}
+
+
+            }
+        }
+
+
+        public void onAccuracyChanged(Sensor sensor, int accuracy) {
+            // TODO Auto-generated method stub
+
+        }
 
 
    private interface MessageConstants {
@@ -293,8 +407,10 @@ Handler handler=new Handler(Looper.getMainLooper());
                 case MessageConstants.MESSAGE_WRITE:
                     byte[] writeBuffer = (byte[]) msg.obj;
                     String writeMessage = new String(writeBuffer);
+                    TextView rssi = (TextView) findViewById(R.id.rssi);
+                    rssi.setText("Sent" + writeMessage);
                     //arrayAdapterMsg.add("Me: " + "test");
-                    Toast.makeText(getBaseContext(), writeMessage, Toast.LENGTH_LONG).show();
+                    //Toast.makeText(getBaseContext(), writeMessage, Toast.LENGTH_LONG).show();
 
                     break;
             }
@@ -324,7 +440,7 @@ Handler handler=new Handler(Looper.getMainLooper());
  Log.e(TAG, "Error occurred when creating output stream", e);
  }*/
 
-            mmInStream = tmpIn;
+           mmInStream = tmpIn;
 // mmOutStream = tmpOut;
         }
 
@@ -368,7 +484,7 @@ Handler handler=new Handler(Looper.getMainLooper());
             } catch (IOException e) {
                 Log.e("raj", "Error occurred when creating input stream", e);
             }*/
-            try {
+           try {
                 tmpOut = socket.getOutputStream();
             } catch (IOException e) {
                 Log.e("raj", "Error occurred when creating output stream", e);
@@ -398,6 +514,22 @@ Handler handler=new Handler(Looper.getMainLooper());
         }
 
     }
+    public void cancel() {
+        try {
+            mmServerSocket.close();
+        } catch (IOException e) {
+            Log.e("raj", "Could not close the connect socket", e);
+        }
 
+    }
+    public void onDestroy(){
+        super.onDestroy();
+        try {
+            mmServerSocket.close();
+            Log.v("raj", "socket close");
+        } catch (IOException e) {
+            Log.e("raj", "Could not close the connect socket", e);
+        }
+    }
 
 }
